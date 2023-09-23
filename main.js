@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         哔记-B Note (B站笔记插件)
 // @namespace    http://tampermonkey.net/
-// @version      0.1
+// @version      0.3
 // @description  可替代B站原有笔记功能的油猴插件（时间戳、截图、本地导入导出、字幕遮挡、快捷键、markdown写作）
 // @author       XYZ
 // @match        *://*.bilibili.com/video/*
@@ -11,23 +11,23 @@
 // @require      https://code.jquery.com/ui/1.12.1/jquery-ui.js
 // @require      https://cdnjs.cloudflare.com/ajax/libs/jszip/3.5.0/jszip.min.js
 // @license      MIT License
-
+ 
 // ==/UserScript==
-
+ 
 (function () {
     'use strict';
-
+ 
     // Add the TOAST UI Editor CSS
     $('head').append('<link rel="stylesheet" href="https://uicdn.toast.com/editor/latest/toastui-editor.min.css" />');
-
+ 
     // Add the TOAST UI Editor JS
     const scriptEditor = document.createElement('script');
     scriptEditor.src = 'https://uicdn.toast.com/editor/latest/toastui-editor-all.min.js';
     document.body.appendChild(scriptEditor);
-
+ 
     // Add the JQuery UI
     $('head').append('<link rel="stylesheet" href="https://code.jquery.com/ui/1.12.1/themes/base/jquery-ui.css">');
-
+ 
     // Bilibili AVI switch
      const switchToAV1 = () => {
         const radioInputs = document.querySelectorAll('input[type="radio"][name="bui-radio3"]');
@@ -40,8 +40,8 @@
     };
     const observer = new MutationObserver(switchToAV1);
     observer.observe(document.body, { childList: true, subtree: true });
-
-
+ 
+ 
     // Create a switch using SVG.
     function createSVGIcon(svgContent) {
         const svgIcon = $(svgContent);
@@ -50,20 +50,20 @@
     }
     const openEditorIcon = '<svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg" width="20" height="20"><path d="M19 3H5a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V5a2 2 0 0 0-2-2zm0 16H5V5h14v14z"/><path d="M0 0h24v24H0z" fill="none"/></svg>';
     const closeEditorIcon = '<svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg" width="20" height="20"><path d="M20 11H4v2h16v-2z"/><path d="M0 0h24v24H0z" fill="none"/></svg>';
-
+ 
     // Create the button
     const openEditorButton = $('<button id="openEditor"></button>');
     //openEditorButton.text('打开哔记');
     openEditorButton.append(createSVGIcon(openEditorIcon));
     openEditorButton.css({ position: 'fixed', bottom: '10px', right: '10px', zIndex: 10000, });
     $('body').append(openEditorButton);
-
+ 
     const toggleButton = $('<button id="toggleEditor"></button>');
     const toggleButtonText = $('<span>打开哔记</span>');
     toggleButton.append(createSVGIcon(openEditorIcon)).append(toggleButtonText);
     toggleButton.css({ position: 'fixed', bottom: '10px', right: '10px', zIndex: 10000, });
     $('body').append(toggleButton);
-
+ 
     // video element
     var videoElement = document.querySelector('video');
     var lastMarkedTime = null;
@@ -75,56 +75,57 @@
     let embedMode = false;
     let originalVideoWrapperParent;
     let originalContainerStyle;
-
+    let originalDisplayStatus = [];
+ 
     // Get the current date, title, and current webpage link.
     function getPageInfo() {
         let currentDate = new Date();
         let formattedDate = `${currentDate.getFullYear()}年${currentDate.getMonth() + 1}月${currentDate.getDate()}日`;
         let pageTitle = document.title;
         let pageLink = window.location.href;
-
+ 
         return { formattedDate, pageTitle, pageLink };
     }
     let pageInfo = getPageInfo();
-
+ 
     // Use IndexedDB to automatically back up notes.
     const dbName = 'BNoteDB';
     const storeName = 'notes';
     let db;
-
+ 
     const openRequest = indexedDB.open(dbName, 1);
-
+ 
     openRequest.onupgradeneeded = function (e) {
         const db = e.target.result;
         if (!db.objectStoreNames.contains(storeName)) {
             db.createObjectStore(storeName, { keyPath: 'pageTitle' });
         }
     };
-
+ 
     openRequest.onsuccess = function (e) {
         db = e.target.result;
     };
-
+ 
     function saveNoteToDB() {
         if (isEditorOpen) {
             let { formattedDate, pageTitle, pageLink } = getPageInfo();
             const content = editor.getMarkdown();
             const timestamp = Date.now();
             const note = { pageTitle, content, timestamp };
-
+ 
             const transaction = db.transaction(storeName, 'readwrite');
             const store = transaction.objectStore(storeName);
             store.put(note);
         }
     }
     setInterval(saveNoteToDB, 120000);
-
-
+ 
+ 
     const container = $('<div id="editorContainer"></div>');
-
+ 
     // Function to create the editor
     function createEditor() {
-
+ 
         container.css({
             position: 'fixed', top: '8%', right: '0%',
             width: '32%', height: '86%',
@@ -132,7 +133,7 @@
             border: '1px solid #ccc', borderRadius: '5px', padding: '0px', overflow: 'hidden',
         });
         $('body').append(container);
-
+ 
         // Make the container resizable
         container.resizable({
             handles: 'n, e, s, w, ne, se, sw, nw',
@@ -143,7 +144,7 @@
                 editorDiv.height(newHeight + 'px');
             }
         });
-
+ 
         const handle = $('<div id="dragHandle">哔记(B-Note)</div>');
         handle.css({
             position: 'sticky',
@@ -160,7 +161,7 @@
             fontStyle: 'bold',
         });
         container.append(handle);
-
+ 
         const buttonDiv = $('<div id="buttonContainer"></div>');
         buttonDiv.css({
             position: 'sticky',
@@ -172,7 +173,7 @@
             gap: '10px',
         });
         container.append(buttonDiv);
-
+ 
         // Get button SVG
         const saveIcon = '<svg fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg" aria-hidden="true" width="25" height="25"><path stroke-linecap="round" stroke-linejoin="round" d="M9 3.75H6.912a2.25 2.25 0 00-2.15 1.588L2.35 13.177a2.25 2.25 0 00-.1.661V18a2.25 2.25 0 002.25 2.25h15A2.25 2.25 0 0021.75 18v-4.162c0-.224-.034-.447-.1-.661L19.24 5.338a2.25 2.25 0 00-2.15-1.588H15M2.25 13.5h3.86a2.25 2.25 0 012.012 1.244l.256.512a2.25 2.25 0 002.013 1.244h3.218a2.25 2.25 0 002.013-1.244l.256-.512a2.25 2.25 0 012.013-1.244h3.859M12 3v8.25m0 0l-3-3m3 3l3-3"></path></svg>';
         const getPositionIcon = '<svg fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg" aria-hidden="true" width="25" height="25"><path stroke-linecap="round" stroke-linejoin="round" d="M15 10.5a3 3 0 11-6 0 3 3 0 016 0z"></path><path stroke-linecap="round" stroke-linejoin="round" d="M19.5 10.5c0 7.142-7.5 11.25-7.5 11.25S4.5 17.642 4.5 10.5a7.5 7.5 0 1115 0z"></path></svg>';
@@ -185,14 +186,14 @@
         const helpIcon = '<svg fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg" aria-hidden="true" width="25" height="25"><path stroke-linecap="round" stroke-linejoin="round" d="M9.879 7.519c1.171-1.025 3.071-1.025 4.242 0 1.172 1.025 1.172 2.687 0 3.712-.203.179-.43.326-.67.442-.745.361-1.45.999-1.45 1.827v.75M21 12a9 9 0 11-18 0 9 9 0 0118 0zm-9 5.25h.008v.008H12v-.008z"></path></svg>';
         const autoBackupIcon = '<svg fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg" aria-hidden="true" width="25" height="25"><path stroke-linecap="round" stroke-linejoin="round" d="M20.25 14.15v4.25c0 1.094-.787 2.036-1.872 2.18-2.087.277-4.216.42-6.378.42s-4.291-.143-6.378-.42c-1.085-.144-1.872-1.086-1.872-2.18v-4.25m16.5 0a2.18 2.18 0 00.75-1.661V8.706c0-1.081-.768-2.015-1.837-2.175a48.114 48.114 0 00-3.413-.387m4.5 8.006c-.194.165-.42.295-.673.38A23.978 23.978 0 0112 15.75c-2.648 0-5.195-.429-7.577-1.22a2.016 2.016 0 01-.673-.38m0 0A2.18 2.18 0 013 12.489V8.706c0-1.081.768-2.015 1.837-2.175a48.111 48.111 0 013.413-.387m7.5 0V5.25A2.25 2.25 0 0013.5 3h-3a2.25 2.25 0 00-2.25 2.25v.894m7.5 0a48.667 48.667 0 00-7.5 0M12 12.75h.008v.008H12v-.008z"></path></svg>';
         const embedModeIcon = '<svg fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg" aria-hidden="true" width="25" height="25"><path stroke-linecap="round" stroke-linejoin="round" d="M12 6.042A8.967 8.967 0 006 3.75c-1.052 0-2.062.18-3 .512v14.25A8.987 8.987 0 016 18c2.305 0 4.408.867 6 2.292m0-14.25a8.966 8.966 0 016-2.292c1.052 0 2.062.18 3 .512v14.25A8.987 8.987 0 0018 18a8.967 8.967 0 00-6 2.292m0-14.25v14.25"></path></svg>';
-
+ 
         // Get save button
         saveButton = createSVGButton(saveIcon, '保存', function () {
             saveEditorContent();
         });
         buttonDiv.append(saveButton);
-
-
+ 
+ 
         // Get video position button
         const getPositionButton = createSVGButton(getPositionIcon, '获取播放位置', function () {
             lastMarkedTime = videoElement.currentTime; // Update the last marked time
@@ -202,11 +203,11 @@
             const timeInBracket = formattedTime.replace('h', ':').replace('m', ':').replace('s', '');
             const formattedURL = '[' + timeInBracket + '](' + newURL + ')';
             editor.replaceSelection(formattedURL); // Insert at cursor
-
+ 
         });
         getPositionButton.setAttribute("id", "getPositionButton");
         buttonDiv.append(getPositionButton);
-
+ 
         // Get jump to last marked time button
         const jumpButton = createSVGButton(jumpIcon, '跳转到上一个标记点', function () {
             videoElement.currentTime = lastMarkedTime; // Jump to the last marked time
@@ -214,17 +215,17 @@
         jumpButton.setAttribute('disabled', true); // Initially disable the jump button
         jumpButton.setAttribute("id", "jumpButton");
         buttonDiv.append(jumpButton);
-
+ 
         // Jump to specific URL time button
         const jumpToURLTimeButton = createSVGButton(jumpToURLTimeIcon, '跳转到指定位置', function () {
             const selection = editor.getSelection();
             const selectedText = editor.getSelectedText(selection[0], selection[1]);
             let timeString;
-
+ 
             const fullMatch = selectedText.match(/\[([0-9]{2}:[0-9]{2}:[0-9]{2})\]\((https:\/\/www\.bilibili\.com\/video\/[^\/]+\/\?t=[^)]+)\)/);
             const timeMatch = selectedText.match(/([0-9]{2}:[0-9]{2}:[0-9]{2})/);
             const urlMatch = selectedText.match(/(https:\/\/www\.bilibili\.com\/video\/[^\/]+\/\?t=([0-9]{2}h)?([0-9]{2}m)?([0-9]{2}s)?)/);
-
+ 
             if (fullMatch) {
                 timeString = fullMatch[1];
             } else if (timeMatch) {
@@ -235,7 +236,7 @@
                 const seconds = urlMatch[4] ? parseInt(urlMatch[4], 10) : 0;
                 timeString = `${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`;
             }
-
+ 
             if (timeString) {
                 const timeParts = timeString.split(':');
                 const seconds = parseInt(timeParts[0], 10) * 3600 + parseInt(timeParts[1], 10) * 60 + parseInt(timeParts[2], 10);
@@ -243,7 +244,7 @@
             }
         });
         buttonDiv.append(jumpToURLTimeButton);
-
+ 
         // Import button
         const importButton = createSVGButton(importIcon, '导入', function () {
             const input = document.createElement('input');
@@ -266,12 +267,12 @@
                         return;
                     }
                     const mdContent = await mdFile.async('text');
-
+ 
                     const replaceImages = async (content) => {
                         const regex = /!\[Image\]\((images\/image\d+\.png)\)/g;
                         let match;
                         let newContent = content;
-
+ 
                         while ((match = regex.exec(content)) !== null) {
                             const imagePath = match[1];
                             const imgFile = zip.file(imagePath);
@@ -282,10 +283,10 @@
                             const imgData = await imgFile.async('base64');
                             newContent = newContent.replace(match[0], `![Image](data:image/png;base64,${imgData})`);
                         }
-
+ 
                         return newContent;
                     };
-
+ 
                     const updatedContent = await replaceImages(mdContent);
                     editor.setMarkdown(updatedContent);
                 } else {
@@ -295,17 +296,17 @@
             input.click();
         });
         buttonDiv.append(importButton);
-
+ 
         // Create the capture button
         const captureButton = createSVGButton(captureIcon, '截图', function () {
             const videoWrapper = document.querySelector('.bpx-player-video-wrap');
             const video = videoWrapper.querySelector('video');
-
+ 
             if (!video) {
                 alert('找不到视频区域，请确保您在正确的页面上。');
                 return;
             }
-
+ 
             const canvas = document.createElement("canvas");
             const ctx = canvas.getContext("2d");
             canvas.width = video.videoWidth / 3;
@@ -316,32 +317,32 @@
         });
         captureButton.setAttribute("id", "captureButton");
         buttonDiv.append(captureButton);
-
-
+ 
+ 
         // Create the blur button
         const blurButton = createSVGButton(blurIcon, '字幕遮挡', function () {
             createBlurRectangle();
         });
         buttonDiv.append(blurButton);
-
+ 
         // Create the lamp
         const lightButton = createSVGButton(lightIcon, '关灯', function () {
             toggleLight();
         });
         buttonDiv.append(lightButton);
-
+ 
         // Create automatic backups.
         const autoBackupButton = createSVGButton(autoBackupIcon, '自动备份', function () {
             showAutoBackupDialog();
         });
         buttonDiv.append(autoBackupButton);
-
+ 
         // Create embedded note mode.
         const embedModeButton = createSVGButton(embedModeIcon, '内嵌模式', toggleEmbedMode);
         buttonDiv.append(embedModeButton);
-
-
-
+ 
+ 
+ 
         // Create the help button
         function createHelpPopup() {
             const helpPopup = $(`
@@ -371,7 +372,7 @@
                 fontSize: '16px',
             });
             $('body').append(helpPopup);
-
+ 
             helpPopup.dialog({
                 autoOpen: false,
                 modal: true,
@@ -388,17 +389,17 @@
                     }
                 }
             });
-
+ 
             return helpPopup;
         }
-
+ 
         const helpPopup = createHelpPopup();
         helpButton = createSVGButton(helpIcon, '帮助', function() {
             helpPopup.dialog("open");
         });
         buttonDiv.append(helpButton);
-
-
+ 
+ 
         // Create the toast ui editor
         editorDiv = $('<div id="editor"></div>');
         editorDiv.css({
@@ -407,7 +408,7 @@
             zIndex: 9999,
         });
         container.append(editorDiv);
-
+ 
         let { formattedDate, pageTitle, pageLink } = getPageInfo();
         editor = new toastui.Editor({
             el: document.querySelector('#editor'),
@@ -419,10 +420,10 @@
             initialValue: `**标题**：[${pageTitle}](${pageLink})\n**日期**：${formattedDate}\n**摘要**：[添加摘要]\n**标签**：[添加标签]\n\n\n\n\n\n
                           `,
             autofocus: true,
-
+ 
         });
     }
-
+ 
     // Create a button with an SVG icon
     function createSVGButton(svgIcon, tooltipText, onClick) {
         const button = document.createElement('button');
@@ -434,14 +435,14 @@
         button.style.cursor = 'pointer';
         return button;
     }
-
-
+ 
+ 
     // Add click event listener to the button
     openEditorButton.on('click', function () {
         createEditor();
     });
-
-
+ 
+ 
     function createButton(text, clickHandler) {
         const button = $('<button></button>');
         button.text(text);
@@ -458,28 +459,28 @@
         button.click(clickHandler);
         return button;
     }
-
+ 
     async function saveEditorContent() {
         return new Promise(async (resolve) => {
             const content = editor.getMarkdown();
             const zip = new JSZip();
             const imgFolder = zip.folder("images");
             let imgIndex = 1;
-
+ 
             const newContent = content.replace(/!\[Image\]\((data:image\/png;base64,[^\)]+)\)/g, (match, dataUrl) => {
                 const imgName = `image${imgIndex}.png`;
                 imgFolder.file(imgName, dataUrl.split(',')[1], { base64: true });
                 imgIndex++;
                 return `![Image](images/${imgName})`;
             });
-
+ 
             zip.file('editor-content.md', newContent);
             const blob = await zip.generateAsync({ type: 'blob' });
             const url = URL.createObjectURL(blob);
             const link = document.createElement('a');
             link.setAttribute('href', url);
             link.setAttribute('download', 'editor-content.zip');
-
+ 
             link.onclick = () => {
                 setTimeout(() => {
                     URL.revokeObjectURL(url);
@@ -489,9 +490,9 @@
             link.click();
         });
     }
-
-
-
+ 
+ 
+ 
     function getCurrentTimeFormatted() {
         var currentTime = videoElement.currentTime;
         var hours = Math.floor(currentTime / 3600);
@@ -501,11 +502,11 @@
             minutes.toString().padStart(2, '0') + 'm' +
             seconds.toString().padStart(2, '0') + 's';
     }
-
+ 
     function getVideoURL() {
         return window.location.href.split('?')[0];
     }
-
+ 
     // make editor draggable
     $(document).on('mousedown', '#dragHandle', function (event) {
         const container = $('#editorContainer');
@@ -530,7 +531,7 @@
     }).on('mouseup', function () {
         $('.draggable').removeClass('draggable');
     });
-
+ 
     let blurRectangle = null;
     function createBlurRectangle() {
         if (blurRectangle) {
@@ -549,7 +550,7 @@
             blurRectangle.style.cursor = 'move';
             blurRectangle.style.clipPath = 'polygon(0% 0%, 100% 0%, 100% calc(100% - 10px), calc(100% - 10px) 100%, 0% 100%)';
             document.body.appendChild(blurRectangle);
-
+ 
             const div = document.createElement('div');
             div.style.width = '40px';
             div.style.height = '40px';
@@ -561,12 +562,12 @@
             div.style.right = '-5px';
             div.style.bottom = '-5px';
             blurRectangle.appendChild(div);
-
+ 
             let isMoving = false;
             let isResizing = false;
             let lastDownX = 0;
             let lastDownY = 0;
-
+ 
             blurRectangle.addEventListener('mousedown', (e) => {
                 e.preventDefault();
                 if (e.target === blurRectangle) {
@@ -574,11 +575,11 @@
                 } else {
                     isResizing = true;
                 }
-
+ 
                 lastDownX = e.clientX;
                 lastDownY = e.clientY;
             });
-
+ 
             document.addEventListener('mousemove', (e) => {
                 if (isMoving) {
                     blurRectangle.style.left = (blurRectangle.offsetLeft - lastDownX + e.clientX) + 'px';
@@ -589,23 +590,23 @@
                 if (isResizing) {
                     const offsetX = e.clientX - lastDownX;
                     const offsetY = e.clientY - lastDownY;
-
+ 
                     blurRectangle.style.width = (blurRectangle.offsetWidth + offsetX) + 'px';
                     blurRectangle.style.height = (blurRectangle.offsetHeight + offsetY) + 'px';
-
+ 
                     lastDownX = e.clientX;
                     lastDownY = e.clientY;
                 }
             });
-
+ 
             document.addEventListener('mouseup', () => {
                 isMoving = false;
                 isResizing = false;
             });
         }
     }
-
-
+ 
+ 
     function downloadImage(dataUrl, filename) {
         const link = document.createElement('a');
         link.href = dataUrl;
@@ -615,8 +616,11 @@
         link.click();
         document.body.removeChild(link);
     }
-
+ 
     function toggleLight() {
+        if (embedMode) {
+            return;
+        }
         const target = document.querySelector("#bilibili-player > .bpx-docker.bpx-docker-major");
         const header = document.querySelector(".bili-header.fixed-header");
         target.classList.toggle("bpx-state-light-off");
@@ -628,18 +632,18 @@
             header.style.display = 'none';
         }
     }
-
+ 
     // Display the most recent 6 backups of notes.
     function showAutoBackupDialog() {
         const transaction = db.transaction(storeName, 'readonly');
         const store = transaction.objectStore(storeName);
         const request = store.getAll();
-
+ 
         request.onsuccess = function (e) {
             const notes = e.target.result;
-
+ 
             notes.sort((a, b) => b.timestamp - a.timestamp);
-
+ 
             const dialog = $('<div id="autoBackupDialog"></div>');
             dialog.css({
                 position: 'fixed',
@@ -652,12 +656,12 @@
                 borderRadius: '5px',
                 boxShadow: '0 0 10px rgba(0, 0, 0, 0.5)',
             });
-
+ 
             const recentNotes = notes.slice(0, 6);
-
+ 
             recentNotes.forEach((note) => {
                 const noteButton = $('<button></button>');
-
+ 
                 const timestamp = new Date(note.timestamp);
                 const dateFormatter = new Intl.DateTimeFormat('zh-CN', {
                     timeZone: 'Asia/Shanghai',
@@ -669,10 +673,10 @@
                     second: '2-digit'
                 });
                 const formattedTime = dateFormatter.format(timestamp);
-
-
+ 
+ 
                 noteButton.text(`${formattedTime} - ${note.pageTitle}`);
-
+ 
                 noteButton.css({
                     display: 'block',
                     width: '100%',
@@ -685,7 +689,7 @@
                 });
                 dialog.append(noteButton);
             });
-
+ 
             const cancelButton = $('<button>取消</button>');
             cancelButton.css({
                 display: 'block',
@@ -696,15 +700,15 @@
                 dialog.remove();
             });
             dialog.append(cancelButton);
-
+ 
             $('body').append(dialog);
         };
     }
-
+ 
     function loadNoteToEditor(note) {
         editor.setMarkdown(note.content);
     }
-
+ 
     function toggleEmbedMode() {
         embedMode = !embedMode;
         if (embedMode) {
@@ -713,10 +717,16 @@
             exitEmbedMode();
         }
     }
-
-
+ 
+ 
     function enterEmbedMode() {
-
+        originalDisplayStatus = [];
+        $('body > *').each(function () {
+            if (!$(this).hasClass('ui-dialog')) {
+                originalDisplayStatus.push($(this).css('display'));
+            }
+        });
+ 
         const newContainer = $('<div></div>');
         newContainer.css({ width: '50%', float: 'left', height: '100%' });
         const videoWrapper = $('#bilibili-player');
@@ -725,7 +735,7 @@
         const iframe = videoWrapper.find('iframe');
         iframe.css({ width: '100%', height: '100%' });
         newContainer.append(videoWrapper);
-
+ 
         const rightContainer = $('<div></div>');
         rightContainer.css({ width: '50%', float: 'right', height: '100%' });
         originalContainerStyle = container.attr('style');
@@ -746,16 +756,16 @@
         $(document).off('mousedown', '#dragHandle');
         container.resizable('destroy');
         editor.setHeight('90%');
-
+ 
         const mainContainer = $('<div></div>');
         mainContainer.css({ width: '100%', height: '100%', position: 'fixed', top: '0', left: '0' });
         mainContainer.append(newContainer);
         mainContainer.append(rightContainer);
-
+ 
         $('body').prepend(mainContainer);
-
+ 
         $('body > *:not(:first-child)').hide();
-
+ 
         newContainer.resizable({
             handles: 'e',
             minWidth: $(window).width() * 0.2,
@@ -764,26 +774,30 @@
                 rightContainer.css('width', 100 - (ui.size.width / $(window).width() * 100) + '%');
             }
         });
-
+ 
     }
-
-
+ 
+ 
     function exitEmbedMode() {
         container.attr('style', originalContainerStyle);
         editor.setHeight(container.height() - 80 + 'px');
-
+ 
         const videoWrapper = $('#bilibili-player');
         videoWrapper.css({ width: '', height: '' });
         const iframe = videoWrapper.find('iframe');
         iframe.css({ width: '', height: '' });
         originalVideoWrapperParent.append(videoWrapper);
         $('body').append(container);
-
+ 
         const mainContainer = $('body > :first-child');
         mainContainer.remove();
-
-        $('body > *:hidden:not(.ui-dialog)').show();
-
+ 
+        $('body > *').each(function (index) {
+            if (!$(this).hasClass('ui-dialog')) {
+                $(this).css('display', originalDisplayStatus[index]);
+            }
+        });
+ 
         $(document).on('mousedown', '#dragHandle', function (event) {
             const container = $('#editorContainer');
             const offset = {
@@ -807,7 +821,7 @@
         }).on('mouseup', function () {
             $('.draggable').removeClass('draggable');
         });
-
+ 
         container.resizable({
             handles: 'n, e, s, w, ne, se, sw, nw',
             minWidth: 300,
@@ -817,11 +831,11 @@
                 editorDiv.height(newHeight + 'px');
             }
         });
-
-
+ 
+ 
     }
-
-
+ 
+ 
     // The operation after the current video playback ends.
     // Function to close the editor and save the content if confirmed
     async function closeAndSave() {
@@ -830,13 +844,19 @@
             if (r == true) {
                 await saveEditorContent();
             }
+             if (embedMode) {
+                exitEmbedMode();
+            }
+ 
             $('#editorContainer').remove();
             toggleButton.empty().append(createSVGIcon(openEditorIcon)).append(toggleButtonText.text('打开哔记'));
+ 
+ 
         }
-
+ 
     }
-
-
+ 
+ 
     // Handler for toggle button click
     toggleButton.click(function() {
         if (toggleButtonText.text() === '打开哔记') {
@@ -850,8 +870,8 @@
     });
     // Listen for the video to end and trigger the close and save function
     videoElement.addEventListener('ended', closeAndSave);
-
-
+ 
+ 
     // Shortcut settings.
     document.addEventListener('keydown', function (event) {
         if (event.altKey) {
@@ -870,7 +890,7 @@
             }
         }
     });
-
-
-
+ 
+ 
+ 
 })();
