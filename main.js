@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         哔记-B Note (B站笔记插件)
 // @namespace    http://tampermonkey.net/
-// @version      1.01
+// @version      1.21
 // @description  可替代B站原有笔记功能的油猴插件（时间戳、截图、本地导入导出、字幕遮挡、快捷键、markdown写作）
 // @author       XYZ
 // @match        *://*.bilibili.com/video/*
@@ -542,8 +542,14 @@
                     reader.readAsText(file);
                 } else if (file.name.endsWith('.zip')) {
                     const zip = await JSZip.loadAsync(file);
+                    /*
+                    const mdFile = zip.file('editor-content.md');
+                    if (!mdFile) {
+                        alert('找不到.md 文件。');
+                        return;
+                    }
+                    */
                     let mdFile;
-                    
                     zip.forEach((relativePath, zipEntry) => {
                         if (zipEntry.name.endsWith('.md')) {
                             mdFile = zipEntry;
@@ -649,8 +655,8 @@
                         <li> 8. ${autoBackupIcon.replace('width="25" height="25"', 'width="15" height="15"')} 自动备份。自动备份最近的6条笔记。</li>
                         <li> 9. ${embedModeIcon.replace('width="25" height="25"', 'width="15" height="15"')} 内嵌模式。点击后进入笔记分屏效果（再次点击该按钮退出分屏效果）。特别的，对于分part视频（注意，不是合集视频），将在页面左下方产生一个悬浮的选集弹窗。点开之后，会跳出选集界面。当鼠标离开选集弹窗后，弹窗会自动关闭。</li>
                         <li> 10.${helpIcon.replace('width="25" height="25"', 'width="15" height="15"')} 帮助按钮。用法提示。</li>
-                        <li> 11.在线/本地选择框。可选择将笔记中插入的图片保存在本地还是上传到github图床。可以<strong><a href="https://github.com/Xiang-yuZHAO/B-Note_img" target="_blank">【点击此处】</a></strong>查看github在线图床配置。 </li>
-                        <li> 12.  Tip1。添加了额外的视频播放暂停/开始<strong>快捷键alt+B</strong>。</li>
+                        <li> 11.在线/本地选择框。可选择将笔记中插入的图片保存在本地或者上传到github图床。可以<strong><a href="https://github.com/Xiang-yuZHAO/B-Note_img" target="_blank">【点击此处】</a></strong>查看github在线图床配置。 </li>
+                        <li> 12.  Tip1。添加了额外的视频播放暂停/开始<strong>快捷键alt+B</strong>。视频后退5秒<strong>快捷键alt+N</strong>。视频前进5秒<strong>快捷键alt+M</strong>。</li>
                         <li> 13. Tip2。可以通过拖拽顶部调整哔记的位置。</li>
                         <li> 14. Tip3。哔记有wysiwyg(实时预览)和markdown两种模式(可在右下角切换)，但是在实时预览模式下插入时间戳会被强制转义为文本。</li>
                         <li> 15. Tip4。使用快捷键可帮你更快的记录笔记。</li>
@@ -664,11 +670,11 @@
             helpPopup.dialog({
                 autoOpen: false,
                 modal: true,
-                width: '40%',
+                width: '50%',
                 zIndex: 99999,
                 position: {
                     my: "left top",
-                    at: "left+15% top+8%",
+                    at: "left+10% top+8%",
                     of: window
                 },
                 buttons: {
@@ -861,6 +867,7 @@
         $('.draggable').removeClass('draggable');
     });
  
+ 
     let blurRectangle = null;
     function createBlurRectangle() {
         if (blurRectangle) {
@@ -870,68 +877,29 @@
             blurRectangle = document.createElement('div');
             blurRectangle.style.position = 'fixed';
             blurRectangle.style.zIndex = '10001';
-            blurRectangle.style.left = '7%';
-            blurRectangle.style.bottom = '20%';
-            blurRectangle.style.width = '60%';
-            blurRectangle.style.height = '10%';
+            if (embedMode) {
+                blurRectangle.style.left = '3%';
+                blurRectangle.style.bottom = '30%';
+                blurRectangle.style.width = '45%';
+                blurRectangle.style.height = '10%';
+            } else {
+                blurRectangle.style.left = '7%';
+                blurRectangle.style.bottom = '20%';
+                blurRectangle.style.width = '60%';
+                blurRectangle.style.height = '10%';
+            }
             blurRectangle.style.background = 'rgba(255, 255, 255, 0.2)';
             blurRectangle.style.backdropFilter = 'blur(8px)';
             blurRectangle.style.cursor = 'move';
-            blurRectangle.style.clipPath = 'polygon(0% 0%, 100% 0%, 100% calc(100% - 10px), calc(100% - 10px) 100%, 0% 100%)';
             document.body.appendChild(blurRectangle);
  
-            const div = document.createElement('div');
-            div.style.width = '40px';
-            div.style.height = '40px';
-            div.style.background = 'rgba(255, 255, 255, 0)';
-            div.style.borderRadius = '50%';
-            div.style.position = 'absolute';
-            div.style.cursor = 'se-resize';
-            div.style.zIndex = '10002';
-            div.style.right = '-5px';
-            div.style.bottom = '-5px';
-            blurRectangle.appendChild(div);
- 
-            let isMoving = false;
-            let isResizing = false;
-            let lastDownX = 0;
-            let lastDownY = 0;
- 
-            blurRectangle.addEventListener('mousedown', (e) => {
-                e.preventDefault();
-                if (e.target === blurRectangle) {
-                    isMoving = true;
-                } else {
-                    isResizing = true;
-                }
- 
-                lastDownX = e.clientX;
-                lastDownY = e.clientY;
+            $(blurRectangle).resizable({
+                handles: 'n, e, s, w, ne, se, sw, nw',
+                minWidth: 50,
+                minHeight: 50
             });
  
-            document.addEventListener('mousemove', (e) => {
-                if (isMoving) {
-                    blurRectangle.style.left = (blurRectangle.offsetLeft - lastDownX + e.clientX) + 'px';
-                    blurRectangle.style.top = (blurRectangle.offsetTop - lastDownY + e.clientY) + 'px';
-                    lastDownX = e.clientX;
-                    lastDownY = e.clientY;
-                }
-                if (isResizing) {
-                    const offsetX = e.clientX - lastDownX;
-                    const offsetY = e.clientY - lastDownY;
- 
-                    blurRectangle.style.width = (blurRectangle.offsetWidth + offsetX) + 'px';
-                    blurRectangle.style.height = (blurRectangle.offsetHeight + offsetY) + 'px';
- 
-                    lastDownX = e.clientX;
-                    lastDownY = e.clientY;
-                }
-            });
- 
-            document.addEventListener('mouseup', () => {
-                isMoving = false;
-                isResizing = false;
-            });
+            $(blurRectangle).draggable();
         }
     }
  
@@ -1289,6 +1257,12 @@
                 }
             } else if (event.key === 'V' || event.key === 'v') {
                 document.getElementById('captureButton').click();
+            } else if (event.key === 'N' || event.key === 'n') {
+                const currentTime = videoElement.currentTime;
+                videoElement.currentTime = Math.max(currentTime - 5, 0);
+            } else if (event.key === 'M' || event.key === 'm') {
+                const currentTime = videoElement.currentTime;
+                videoElement.currentTime = Math.min(currentTime + 5, videoElement.duration);
             }
         }
     });
