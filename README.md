@@ -31,7 +31,7 @@
 
 ## ♦安装指南
 - 安装浏览器扩展Tampermonkey。可在浏览器插件商店安装（[chrome插件商店](https://chrome.google.com/webstore/detail/tampermonkey/dhdgffkkebhmkfjojejmpbldmpobfkfo?hl=zh-CN)、[Edge商店](https://microsoftedge.microsoft.com/addons/detail/%E7%AF%A1%E6%94%B9%E7%8C%B4/iikmkjmpaadaobahmlepeloendndfphd?hl=zh-CN)）。
-- 在此处安装脚本。
+- 在[此处](https://greasyfork.org/zh-CN/scripts/475808-%E5%93%94%E8%AE%B0-b-note-b%E7%AB%99%E7%AC%94%E8%AE%B0%E6%8F%92%E4%BB%B6)安装脚本。
 
 ## ♦使用说明
 - 点击油猴图标启用脚本。
