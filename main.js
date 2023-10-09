@@ -1,12 +1,11 @@
 // ==UserScript==
 // @name         哔记-B Note (B站笔记插件)
 // @namespace    http://tampermonkey.net/
-// @version      1.4
+// @version      1.5
 // @description  可替代B站原有笔记功能的油猴插件（时间戳、截图、本地导入导出、字幕遮挡、快捷键、markdown写作）
 // @author       XYZ
 // @match        *://*.bilibili.com/video/*
 // @require      https://code.jquery.com/jquery-3.6.0.min.js
-// @require      https://code.jquery.com/ui/1.12.1/jquery-ui.min.js
 // @require      https://code.jquery.com/ui/1.12.1/jquery-ui.js
 // @require      https://cdnjs.cloudflare.com/ajax/libs/jszip/3.5.0/jszip.min.js
 // @require      https://unpkg.com/axios@1.1.2/dist/axios.min.js
@@ -198,17 +197,37 @@
     const closeEditorIcon = '<svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg" width="20" height="20"><path d="M20 11H4v2h16v-2z"/><path d="M0 0h24v24H0z" fill="none"/></svg>';
 
     // Create the button
-    const openEditorButton = $('<button id="openEditor"></button>');
-    //openEditorButton.text('打开哔记');
+    const openEditorButton = $('<button id="openEditor" class="B-Note-button"></button>');
     openEditorButton.append(createSVGIcon(openEditorIcon));
-    openEditorButton.css({ position: 'fixed', bottom: '10px', right: '10px', zIndex: 10000, });
     $('body').append(openEditorButton);
 
-    const toggleButton = $('<button id="toggleEditor"></button>');
+    const toggleButton = $('<button id="toggleEditor" class="B-Note-button"></button>');
     const toggleButtonText = $('<span>打开哔记</span>');
     toggleButton.append(createSVGIcon(openEditorIcon)).append(toggleButtonText);
-    toggleButton.css({ position: 'fixed', bottom: '10px', right: '10px', zIndex: 10000, });
     $('body').append(toggleButton);
+
+    const buttonStyles = `
+      .B-Note-button {
+         position: fixed;
+         bottom: 10px;
+         right: -60px;
+         width: 100px;
+         height: 35px;
+         z-index: 10000;
+         background-color: white;
+         border: none;
+         cursor: pointer;
+         transition: right 0.3s, background-color 0.3s;
+      }
+
+      .B-Note-button:hover {
+         right: 0px;
+      }
+    `;
+    const styleElement = $('<style></style>');
+    styleElement.text(buttonStyles);
+    $('head').append(styleElement);
+
 
     // video element
     var videoElement = document.querySelector('video');
@@ -798,7 +817,7 @@
             const imgFolder = zip.folder("images");
             let imgIndex = 1;
 
-            const newContent = content.replace(/!\[Image\]\((data:image\/png;base64,[^\)]+)\)/g, (match, dataUrl) => {
+            const newContent = content.replace(/!\[[^\]]*\]\((data:image\/[^;]+;base64,[^\)]+)\)/g, (match, dataUrl) => {
                 const imgName = `image${imgIndex}.png`;
                 imgFolder.file(imgName, dataUrl.split(',')[1], { base64: true });
                 imgIndex++;
@@ -1350,7 +1369,6 @@
             });
         });
     });
-
 
 
 })();
