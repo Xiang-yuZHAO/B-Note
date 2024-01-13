@@ -27,7 +27,7 @@
 8. 支持github在线图床，便于笔记的分享。
 
 ## ♦支持的网站
-- [哔哩哔哩](www.bilibili.com)
+- [哔哩哔哩](https://www.bilibili.com/)
 
 ## ♦安装指南
 - 安装浏览器扩展Tampermonkey。可在浏览器插件商店安装（[chrome插件商店](https://chrome.google.com/webstore/detail/tampermonkey/dhdgffkkebhmkfjojejmpbldmpobfkfo?hl=zh-CN)、[Edge商店](https://microsoftedge.microsoft.com/addons/detail/%E7%AF%A1%E6%94%B9%E7%8C%B4/iikmkjmpaadaobahmlepeloendndfphd?hl=zh-CN)）。
