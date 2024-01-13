@@ -51,5 +51,9 @@
 - 视频后退5秒：alt+N
 - 视频前进5秒：alt+M
 
+## ♦后续更新计划
+- [ ] 可进行 AI 视频总结
+- [ ] 修改编辑器中图片存储方式
+
 ## ♦贡献
 欢迎贡献代码和提供反馈！请通过[GitHub](https://github.com/Xiang-yuZHAO/B-Note)的Issue和Pull Request进行。
